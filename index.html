@@ -281,13 +281,45 @@ document.head.appendChild(tag);
 
 window.onYouTubeIframeAPIReady = function(){ createPlayer(track.meta.video.id); };
 
+// If the YouTube API script is blocked (ad blockers and privacy extensions do this),
+// nothing ever mounts. Say so instead of showing a silent black pane.
+setTimeout(()=>{
+  if(!window.YT || !YT.Player){
+    addMsg('system','The YouTube player API did not load. An ad blocker or privacy extension may be blocking www.youtube.com/iframe_api on this page. Allow it for this site and refresh.');
+  }
+}, 6000);
+
+const YT_ERRORS = {
+  2:'Invalid video ID. Check the id field in the track. It must be the 11 character code from the watch URL.',
+  5:'This video cannot play in the embedded HTML5 player.',
+  100:'Video not found. It may be private or deleted.',
+  101:'The owner of this video has disabled embedding, so it cannot play on any external site.',
+  150:'The owner of this video has disabled embedding, so it cannot play on any external site.'
+};
+
+function extractVideoId(v){
+  if(!v) return v;
+  v = v.trim();
+  // Already a bare 11 character ID
+  if(/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+  // watch?v= , youtu.be/ , /embed/ , /live/ , /shorts/
+  const m = v.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/live\/|\/shorts\/)([A-Za-z0-9_-]{11})/);
+  if(m) return m[1];
+  return v;
+}
+
 function createPlayer(videoId){
-  if(player){ player.destroy(); player=null; playerReady=false; }
+  videoId = extractVideoId(videoId);
+  if(player){ try{ player.destroy(); }catch(e){} player=null; playerReady=false; duration=0; }
+  // destroy() removes the mount element entirely, so rebuild it before creating a new player
+  const ratio = document.querySelector('.ratio');
+  ratio.innerHTML = '<div id="player"></div>';
   player = new YT.Player('player',{
     videoId, playerVars:{rel:0, modestbranding:1},
     events:{
       onReady:()=>{ playerReady=true; duration=player.getDuration()||0; buildRail(); startPoll(); updateClock(); },
-      onStateChange:(e)=>{ if(e.data===YT.PlayerState.PLAYING && duration===0){ duration=player.getDuration()||0; buildRail(); } }
+      onStateChange:(e)=>{ if(e.data===YT.PlayerState.PLAYING && duration===0){ duration=player.getDuration()||0; buildRail(); } },
+      onError:(e)=>{ addMsg('system','Video failed to load. '+(YT_ERRORS[e.data]||('YouTube error code '+e.data+'.'))); }
     }
   });
 }
@@ -586,9 +618,17 @@ function applyTrack(json, sourceLabel){
   addMsg('system','Loaded track: '+(track.meta.title||sourceLabel));
   if(window.YT && YT.Player){ createPlayer(track.meta.video.id); }
 }
+function normaliseTrackUrl(url){
+  // A github.com blob link is the HTML page, not the file. Convert it to the raw file.
+  const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/);
+  if(m) return 'https://raw.githubusercontent.com/'+m[1]+'/'+m[2]+'/'+m[3];
+  return url;
+}
 function loadTrackFromUrl(){
-  const url = document.getElementById('trackUrl').value.trim();
+  let url = document.getElementById('trackUrl').value.trim();
   if(!url) return;
+  const fixed = normaliseTrackUrl(url);
+  if(fixed!==url){ addMsg('system','That was a GitHub page link, not the raw file. Using the raw URL instead.'); url=fixed; }
   fetch(url).then(r=>r.json()).then(j=>applyTrack(j,url))
     .catch(()=>addMsg('system','Could not fetch or parse that URL. It must serve raw JSON with CORS allowed, for example a raw.githubusercontent.com link.'));
 }
