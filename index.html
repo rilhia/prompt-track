@@ -217,7 +217,7 @@ footer a:hover{color:var(--cyan)}
 </section>
 
 <footer>
-  <span>Prompt Track reference player <b style="color:var(--cyan)">build v0.4</b>. A pattern proposal by Richard Hall.</span>
+  <span>Prompt Track reference player <b style="color:var(--cyan)">build v0.5</b>. A pattern proposal by Richard Hall.</span>
   <span>Video never modified. Track is a sidecar. Learner does all the work.</span>
 </footer>
 
@@ -315,7 +315,7 @@ function createPlayer(videoId){
   const ratio = document.querySelector('.ratio');
   ratio.innerHTML = '<div id="player"></div>';
   player = new YT.Player('player',{
-    videoId, playerVars:{rel:0, modestbranding:1},
+    videoId, host:'https://www.youtube-nocookie.com', playerVars:{rel:0, modestbranding:1},
     events:{
       onReady:()=>{ playerReady=true; duration=player.getDuration()||0; buildRail(); startPoll(); updateClock(); },
       onStateChange:(e)=>{ if(e.data===YT.PlayerState.PLAYING && duration===0){ duration=player.getDuration()||0; buildRail(); } },
