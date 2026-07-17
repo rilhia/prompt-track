@@ -182,7 +182,7 @@ footer a:hover{color:var(--cyan)}
     <div class="loader">
       <h3>Load a different video and track</h3>
       <div class="loader-row">
-        <input type="url" id="trackUrl" placeholder="https://raw.githubusercontent.com/you/repo/main/my-track.json" aria-label="URL of a raw track JSON file">
+        <input type="url" id="trackUrl" value="https://rilhia.github.io/prompt-track/sample-track.json" placeholder="https://rilhia.github.io/prompt-track/sample-track.json" aria-label="URL of a raw track JSON file">
         <button class="btn" onclick="loadTrackFromUrl()">Load from URL</button>
         <button class="btn" onclick="document.getElementById('trackFile').click()">Load from file</button>
         <input type="file" id="trackFile" accept=".json,application/json" hidden onchange="loadTrackFromFile(this.files[0])">
@@ -217,7 +217,7 @@ footer a:hover{color:var(--cyan)}
 </section>
 
 <footer>
-  <span>Prompt Track reference player <b style="color:var(--cyan)">build v0.5</b>. A pattern proposal by Richard Hall.</span>
+  <span>Prompt Track reference player <b style="color:var(--cyan)">build v0.6</b>. A pattern proposal by Richard Hall.</span>
   <span>Video never modified. Track is a sidecar. Learner does all the work.</span>
 </footer>
 
