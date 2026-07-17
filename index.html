@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Track. A caption track for doing, not just reading.</title>
+<meta name="description" content="A reference player for prompt tracks. Timestamped, creator authored AI companion cues attached to an ordinary video, toggleable like captions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --carbon:#0e1116;
+  --slate:#161b22;
+  --slate-2:#1c232d;
+  --line:#28303c;
+  --text:#e8edf2;
+  --muted:#8b96a5;
+  --cyan:#35d6e8;
+  --purple:#9d7bff;
+  --amber:#ffc24b;
+  --amber-dim:rgba(255,194,75,.14);
+  --cyan-dim:rgba(53,214,232,.12);
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --disp:'Space Grotesk',sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--carbon);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 28px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.wordmark{font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:.02em}
+.wordmark .p{color:var(--cyan)}
+.wordmark .t{color:var(--purple)}
+.wordmark small{display:block;font-family:var(--body);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0}
+.mode{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--slate)}
+.mode button{padding:9px 18px;background:transparent;border:0;color:var(--muted);font-size:13.5px;font-weight:600;font-family:var(--disp);letter-spacing:.02em;transition:background .18s,color .18s}
+.mode button[aria-pressed="true"]{color:var(--carbon)}
+.mode button[data-mode="lean"][aria-pressed="true"]{background:var(--purple)}
+.mode button[data-mode="lab"][aria-pressed="true"]{background:var(--cyan)}
+.mode-hint{font-size:12.5px;color:var(--muted);max-width:340px}
+
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:22px;padding:22px 28px;max-width:1320px;margin:0 auto}
+@media(max-width:960px){main{grid-template-columns:1fr}}
+
+/* ---------- stage ---------- */
+.stage{min-width:0}
+.frame{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#000;transition:box-shadow .3s}
+.frame.cue-live{box-shadow:0 0 0 1px var(--amber),0 0 34px rgba(255,194,75,.18)}
+.ratio{position:relative;padding-top:56.25%}
+.ratio iframe,#player{position:absolute;inset:0;width:100%;height:100%;border:0}
+.scrim{position:absolute;inset:0;background:rgba(14,17,22,.55);opacity:0;pointer-events:none;transition:opacity .3s;display:flex;align-items:flex-end;justify-content:flex-start;padding:18px}
+.frame.cue-live .scrim{opacity:1}
+.scrim .flag{font-family:var(--disp);font-weight:600;font-size:13px;color:var(--carbon);background:var(--amber);border-radius:8px;padding:6px 12px}
+
+/* ---------- track rail (signature) ---------- */
+.rail-wrap{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--slate);padding:14px 18px 10px}
+.rail-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+.rail-head h2{font-family:var(--disp);font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rail-head h2 b{color:var(--cyan);font-weight:600}
+#clock{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.rail{position:relative;height:34px}
+.rail-line{position:absolute;left:0;right:0;top:16px;height:2px;background:var(--line);border-radius:2px}
+.rail-prog{position:absolute;left:0;top:16px;height:2px;width:0;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:2px;transition:width .25s linear}
+.cue-mark{position:absolute;top:9px;width:16px;height:16px;transform:translateX(-50%) rotate(45deg);background:var(--slate-2);border:2px solid var(--muted);border-radius:3px;transition:border-color .2s,background .2s;cursor:pointer}
+.cue-mark:hover{border-color:var(--cyan)}
+.cue-mark.passed{border-color:var(--cyan);background:var(--cyan-dim)}
+.cue-mark.live{border-color:var(--amber);background:var(--amber);animation:pulse 1.4s ease-in-out infinite}
+.cue-mark.dormant{opacity:.35}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,194,75,.5)}50%{box-shadow:0 0 0 7px rgba(255,194,75,0)}}
+.rail-legend{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.rail-legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;transform:rotate(45deg);border-radius:2px;display:inline-block}
+.dot.d1{border:2px solid var(--muted);background:transparent}
+.dot.d2{background:var(--cyan)}
+.dot.d3{background:var(--amber)}
+
+/* ---------- loader ---------- */
+.loader{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:var(--slate);padding:16px 18px}
+.loader h3{font-family:var(--disp);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.loader-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.loader input[type=url]{flex:1;min-width:220px;background:var(--carbon);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 12px;font-size:13.5px;font-family:var(--mono)}
+.btn{background:var(--slate-2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 16px;font-size:13.5px;font-weight:600;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--cyan)}
+.btn.primary{background:var(--cyan);border-color:var(--cyan);color:var(--carbon)}
+.btn.primary:hover{background:#5fe0ef}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:var(--carbon)}
+.loader .note{margin-top:9px;font-size:12.5px;color:var(--muted)}
+.loader .note code{font-family:var(--mono);font-size:12px;color:var(--cyan)}
+
+/* ---------- chat panel ---------- */
+.panel{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--slate);min-height:560px;max-height:calc(100vh - 130px);position:sticky;top:20px;transition:box-shadow .3s,border-color .3s}
+@media(max-width:960px){.panel{position:static;max-height:none}}
+.panel.cue-live{border-color:var(--amber);box-shadow:0 0 26px rgba(255,194,75,.12)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.panel-head h2{font-family:var(--disp);font-size:15px;font-weight:600}
+.pill{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.sim{color:var(--purple);border-color:var(--purple)}
+.pill.live{color:var(--cyan);border-color:var(--cyan)}
+.chat{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:92%;border-radius:12px;padding:12px 15px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+.msg.companion{background:var(--slate-2);border:1px solid var(--line);align-self:flex-start}
+.msg.companion.cue{border-color:var(--amber);background:var(--amber-dim)}
+.msg.user{background:var(--cyan-dim);border:1px solid rgba(53,214,232,.35);align-self:flex-end}
+.msg.system{align-self:center;background:transparent;color:var(--muted);font-size:12.5px;text-align:center;padding:2px 8px}
+.msg .cue-tag{display:inline-block;font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.codeblock{position:relative;margin-top:10px;background:var(--carbon);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-family:var(--mono);font-size:13px;color:var(--cyan);overflow-x:auto;white-space:pre}
+.copy{position:absolute;top:7px;right:7px;font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--slate-2);color:var(--muted)}
+.copy:hover{color:var(--text);border-color:var(--cyan)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.chip{font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--slate-2);color:var(--text);transition:border-color .15s}
+.chip:hover{border-color:var(--cyan)}
+.chip.resume{background:var(--amber);border-color:var(--amber);color:var(--carbon)}
+.composer{display:flex;gap:9px;padding:14px 16px;border-top:1px solid var(--line)}
+.composer input{flex:1;background:var(--carbon);border:1px solid var(--line);border-radius:9px;color:var(--text);padding:10px 13px;font-size:14px}
+.composer input::placeholder{color:var(--muted)}
+.keybox{padding:11px 16px;border-top:1px solid var(--line);display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.keybox input{flex:1;min-width:180px;background:var(--carbon);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:8px 11px;font-family:var(--mono);font-size:12.5px}
+.keybox label{font-size:12px;color:var(--muted)}
+.keynote{padding:0 16px 12px;font-size:11.5px;color:var(--muted)}
+
+/* ---------- explainer footer ---------- */
+.explain{max-width:1320px;margin:8px auto 46px;padding:0 28px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:960px){.explain{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:12px;background:var(--slate);padding:18px}
+.card h3{font-family:var(--disp);font-size:14px;font-weight:600;margin-bottom:8px}
+.card h3 span{color:var(--cyan);font-family:var(--mono);font-size:12px;margin-right:8px}
+.card p{font-size:13.5px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:18px 28px;font-size:12.5px;color:var(--muted);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+footer a{color:var(--muted)}
+footer a:hover{color:var(--cyan)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark"><span class="p">Prompt</span><span class="t">Track</span>
+    <small>A caption track for doing, not just watching.</small>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <p class="mode-hint" id="modeHint">Lab mode pauses the video at each cue and hands you the step. Lean back plays it clean.</p>
+    <div class="mode" role="group" aria-label="Viewing mode">
+      <button data-mode="lean" aria-pressed="false" onclick="setMode('lean')">Lean back</button>
+      <button data-mode="lab" aria-pressed="true" onclick="setMode('lab')">Lab mode</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="frame" id="frame">
+      <div class="ratio"><div id="player"></div></div>
+      <div class="scrim"><span class="flag">Paused by the track. Your turn.</span></div>
+    </div>
+
+    <div class="rail-wrap">
+      <div class="rail-head">
+        <h2>Prompt track <b id="railState">armed</b></h2>
+        <span id="clock">0:00 / 0:00</span>
+      </div>
+      <div class="rail" id="rail">
+        <div class="rail-line"></div>
+        <div class="rail-prog" id="railProg"></div>
+      </div>
+      <div class="rail-legend">
+        <span><i class="dot d1"></i>Cue ahead</span>
+        <span><i class="dot d2"></i>Cue done</span>
+        <span><i class="dot d3"></i>Cue firing</span>
+        <span style="margin-left:auto"><button class="chip" onclick="resetTrack()" title="Re-arm all cues and return to the start">Reset track</button></span>
+      </div>
+    </div>
+
+    <div class="loader">
+      <h3>Load a different video and track</h3>
+      <div class="loader-row">
+        <input type="url" id="trackUrl" placeholder="https://raw.githubusercontent.com/you/repo/main/my-track.json" aria-label="URL of a raw track JSON file">
+        <button class="btn" onclick="loadTrackFromUrl()">Load from URL</button>
+        <button class="btn" onclick="document.getElementById('trackFile').click()">Load from file</button>
+        <input type="file" id="trackFile" accept=".json,application/json" hidden onchange="loadTrackFromFile(this.files[0])">
+      </div>
+      <p class="note">A track is one JSON sidecar file. It names the video, carries the ground truth, and lists timestamped cues. See <code>sample-track.json</code> in this repository for the format. The video itself is never modified.</p>
+    </div>
+  </section>
+
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <h2>Companion</h2>
+      <span class="pill sim" id="modePill">Simulated</span>
+    </div>
+    <div class="chat" id="chat" aria-live="polite"></div>
+    <div class="composer">
+      <input id="composerInput" type="text" placeholder="Ask about the current step" aria-label="Message the companion" onkeydown="if(event.key==='Enter')sendUserMessage()">
+      <button class="btn primary" onclick="sendUserMessage()">Send</button>
+    </div>
+    <div class="keybox">
+      <label for="apiKey">Live mode</label>
+      <input id="apiKey" type="password" placeholder="Paste an Anthropic API key to talk to Claude" autocomplete="off">
+      <button class="btn" onclick="toggleLive()" id="liveBtn">Go live</button>
+    </div>
+    <p class="keynote">The key stays in this page's memory only. It is never stored, logged or sent anywhere except directly to Anthropic from your browser. Refreshing the page forgets it. Without a key the companion runs a scripted simulation of the same flow.</p>
+  </aside>
+</main>
+
+<section class="explain">
+  <div class="card"><h3><span>01</span>See one</h3><p>Lean back mode. The track stays dormant and the video plays clean, start to finish, so you understand the shape of the task before touching a key. Captions for the machine, switched off.</p></div>
+  <div class="card"><h3><span>02</span>Do one</h3><p>Lab mode. At each cue the video pauses itself and the companion hands over the exact command for your machine, from the creator's ground truth, never transcribed off a blurry frame. You do the work, it holds the pace.</p></div>
+  <div class="card"><h3><span>03</span>Teach one</h3><p>The track is a text sidecar in a repository. Where it stumbled for you, you report, the author edits one cue, and the next learner gets a better teacher. No re-recording. The documentation learns.</p></div>
+</section>
+
+<footer>
+  <span>Prompt Track reference player. A pattern proposal by Richard Hall.</span>
+  <span>Video never modified. Track is a sidecar. Learner does all the work.</span>
+</footer>
+
+<script>
+/* =====================================================
+   Default track (identical content ships as sample-track.json
+   so the sidecar nature of the format is visible in the repo)
+   ===================================================== */
+const DEFAULT_TRACK = {
+  meta:{
+    title:"Prompt Track sample: the format explains itself",
+    author:"Richard Hall",
+    version:"0.1",
+    video:{provider:"youtube",id:"aqz-KE-bpKQ",
+      note:"Big Buck Bunny, a stable public video used as a stand in. Replace with your own tutorial video."},
+    persona:"You are a calm, practical tutorial companion. You never invent facts. Every command, path, port and setting you give must come verbatim from the ground truth in this track. If asked something the track does not cover, say so plainly and point the learner to the project README. You calibrate depth to the learner's stated comfort level. You never execute anything. The learner does all the work.",
+    groundRules:[
+      "Only state facts present in this track. Never improvise commands, paths or settings.",
+      "The learner types every command themselves. Never offer to do it for them.",
+      "One step at a time. Confirm the step worked before moving on.",
+      "If the learner pastes an error, help them read it. If the track cannot explain it, say so and suggest opening an issue on the project repository.",
+      "Adapt depth to the learner. Brief for the confident, patient and thorough for the nervous."
+    ]
+  },
+  cues:[
+    {id:"cue-1",t:12,type:"do",title:"Your first cue",
+     intro:"The video just paused itself. That is a prompt cue firing. In a real tutorial this is the moment the presenter says 'now open a terminal', and instead of you scrubbing back to squint at their screen, the exact command arrives here, correct and copyable. Try this one. It is harmless and just proves your terminal works.",
+     artifacts:{mac:'echo "Prompt tracks: see one, do one, teach one"',windows:'echo Prompt tracks: see one, do one, teach one',any:'echo hello-prompt-track'},
+     deeper:"Why pause the video at all? Because video sets the pace of understanding but cannot hold the pace of doing. Your machine, your versions and your errors are invisible to a recording. The cue hands the doing to a layer that can see them. The video stays clean and uninterrupted for anyone watching in lean back mode, exactly like captions stay invisible until switched on.",
+     completion:"The learner ran the echo command and saw the text printed back."},
+    {id:"cue-2",t:45,type:"checkpoint",title:"A checkpoint cue",
+     intro:"This cue is a checkpoint rather than a step. In a real track this is where the companion asks you to verify state before the video moves on, for example 'run docker compose ps and tell me what you see'. Nothing to run here in the sample. Press done when ready and notice the video resumes exactly where it left off.",
+     artifacts:{},
+     deeper:"Checkpoints are where the ground truth earns its keep. The track author writes down what correct output looks like at this moment, so the companion can judge your pasted output against a known good state instead of guessing. A generic AI bolted onto a video cannot do this because nobody told it what correct looks like.",
+     completion:"The learner confirmed they are ready to continue."},
+    {id:"cue-3",t:90,type:"do",title:"The track is just a file",
+     intro:"One last thing worth knowing. Everything driving this experience is a single JSON sidecar file, versioned in a repository next to the video link. When the software in a tutorial changes, the author edits one cue in this file instead of re-recording the video. Open sample-track.json in this repository to see exactly what the companion was given.",
+     artifacts:{any:"cat sample-track.json"},
+     deeper:"This is the same relationship captions have to video. The video file is never touched. The track is a text sidecar that any editor can open, any repository can version, and any pull request can improve. The 'teach one' step of see one, do one, teach one lives here. Learners report where the track stumbled and the next learner gets a better teacher.",
+     completion:"The learner understands the track is a sidecar file they can read and edit."}
+  ]
+};
+
+/* ===================== state ===================== */
+let track = JSON.parse(JSON.stringify(DEFAULT_TRACK));
+let player = null, playerReady = false, duration = 0;
+let mode = 'lab';                 // 'lean' | 'lab'
+let fired = new Set();            // cue ids already fired
+let activeCue = null;             // cue currently holding the floor
+let liveMode = false;             // Claude live vs simulation
+let apiKeyMem = '';               // memory only, never persisted
+let history = [];                 // live chat history
+let learner = {os:null, comfort:null};
+let calibrated = false;
+let pollTimer = null;
+
+/* ===================== youtube ===================== */
+const tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(tag);
+
+window.onYouTubeIframeAPIReady = function(){ createPlayer(track.meta.video.id); };
+
+function createPlayer(videoId){
+  if(player){ player.destroy(); player=null; playerReady=false; }
+  player = new YT.Player('player',{
+    videoId, playerVars:{rel:0, modestbranding:1},
+    events:{
+      onReady:()=>{ playerReady=true; duration=player.getDuration()||0; buildRail(); startPoll(); updateClock(); },
+      onStateChange:(e)=>{ if(e.data===YT.PlayerState.PLAYING && duration===0){ duration=player.getDuration()||0; buildRail(); } }
+    }
+  });
+}
+
+function startPoll(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(tick, 250);
+}
+
+function tick(){
+  if(!playerReady || !player.getCurrentTime) return;
+  const t = player.getCurrentTime();
+  updateClock(t);
+  updateRail(t);
+  if(mode!=='lab' || activeCue) return;
+  const state = player.getPlayerState ? player.getPlayerState() : -1;
+  if(state!==YT.PlayerState.PLAYING) return;
+  for(const cue of track.cues){
+    // fire when playback crosses the cue timestamp within a 1.2s window
+    if(!fired.has(cue.id) && t>=cue.t && t<cue.t+1.2){ fireCue(cue); break; }
+    // re-arm a cue if the user seeks back well before it
+    if(fired.has(cue.id) && t<cue.t-2 && !activeCue){ fired.delete(cue.id); markCue(cue.id,'armed'); }
+  }
+}
+
+/* ===================== cues ===================== */
+function fireCue(cue){
+  activeCue = cue;
+  fired.add(cue.id);
+  player.pauseVideo();
+  document.getElementById('frame').classList.add('cue-live');
+  document.getElementById('panel').classList.add('cue-live');
+  document.getElementById('railState').textContent = 'holding';
+  markCue(cue.id,'live');
+
+  if(liveMode){
+    sendToClaude(null, cue);   // cue event goes to Claude as the driver
+  } else {
+    renderCueSimulated(cue);
+  }
+}
+
+function resumeFromCue(){
+  if(!activeCue) return;
+  markCue(activeCue.id,'passed');
+  activeCue = null;
+  document.getElementById('frame').classList.remove('cue-live');
+  document.getElementById('panel').classList.remove('cue-live');
+  document.getElementById('railState').textContent = 'armed';
+  addMsg('system','Resuming the video.');
+  player.playVideo();
+}
+
+function resetTrack(){
+  fired.clear(); activeCue=null; history=[];
+  document.getElementById('frame').classList.remove('cue-live');
+  document.getElementById('panel').classList.remove('cue-live');
+  document.getElementById('railState').textContent='armed';
+  track.cues.forEach(c=>markCue(c.id,'armed'));
+  if(playerReady){ player.seekTo(0); player.pauseVideo(); }
+  addMsg('system','Track reset. All cues re-armed.');
+}
+
+/* ===================== rail ===================== */
+function buildRail(){
+  const rail = document.getElementById('rail');
+  rail.querySelectorAll('.cue-mark').forEach(el=>el.remove());
+  if(!duration) return;
+  track.cues.forEach(cue=>{
+    const m = document.createElement('button');
+    m.className = 'cue-mark' + (mode==='lean' ? ' dormant':'');
+    m.id = 'mark-'+cue.id;
+    m.style.left = Math.min(99,(cue.t/duration)*100) + '%';
+    m.title = fmt(cue.t)+'  '+cue.title;
+    m.setAttribute('aria-label','Cue at '+fmt(cue.t)+': '+cue.title);
+    m.onclick = ()=>{ if(playerReady){ player.seekTo(Math.max(0,cue.t-3)); fired.delete(cue.id); markCue(cue.id,'armed'); player.playVideo(); } };
+    rail.appendChild(m);
+  });
+}
+function markCue(id,state){
+  const el = document.getElementById('mark-'+id);
+  if(!el) return;
+  el.classList.remove('live','passed');
+  if(state==='live') el.classList.add('live');
+  if(state==='passed') el.classList.add('passed');
+}
+function updateRail(t){
+  if(!duration) return;
+  document.getElementById('railProg').style.width = Math.min(100,(t/duration)*100)+'%';
+}
+function updateClock(t=0){
+  document.getElementById('clock').textContent = fmt(t)+' / '+fmt(duration);
+}
+function fmt(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+/* ===================== modes ===================== */
+function setMode(next){
+  mode = next;
+  document.querySelectorAll('.mode button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===next)));
+  document.querySelectorAll('.cue-mark').forEach(m=>m.classList.toggle('dormant', next==='lean'));
+  document.getElementById('modeHint').textContent = next==='lab'
+    ? 'Lab mode pauses the video at each cue and hands you the step. Lean back plays it clean.'
+    : 'Lean back mode. The track is dormant. Watch it clean, then switch to lab mode for the second pass.';
+  if(next==='lean' && activeCue){ resumeFromCue(); }
+  if(next==='lab' && !calibrated){ startCalibration(); }
+}
+
+/* ===================== chat rendering ===================== */
+function addMsg(kind, text, extra){
+  const chat = document.getElementById('chat');
+  const el = document.createElement('div');
+  el.className = 'msg '+kind + (extra&&extra.cue?' cue':'');
+  if(extra && extra.cueTag){
+    const tag = document.createElement('span');
+    tag.className='cue-tag'; tag.textContent=extra.cueTag; el.appendChild(tag);
+    el.appendChild(document.createElement('br'));
+  }
+  el.appendChild(document.createTextNode(text));
+  if(extra && extra.code){
+    const cb = document.createElement('div'); cb.className='codeblock'; cb.textContent = extra.code;
+    const cp = document.createElement('button'); cp.className='copy'; cp.textContent='Copy';
+    cp.onclick = ()=>{ navigator.clipboard.writeText(extra.code).then(()=>{cp.textContent='Copied'; setTimeout(()=>cp.textContent='Copy',1400);}); };
+    cb.appendChild(cp); el.appendChild(cb);
+  }
+  if(extra && extra.chips){
+    const row = document.createElement('div'); row.className='chips';
+    extra.chips.forEach(ch=>{
+      const b = document.createElement('button');
+      b.className = 'chip'+(ch.resume?' resume':'');
+      b.textContent = ch.label;
+      b.onclick = ()=>{ row.querySelectorAll('.chip').forEach(x=>x.disabled=true); ch.fn(); };
+      row.appendChild(b);
+    });
+    el.appendChild(row);
+  }
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+  return el;
+}
+
+function artifactFor(cue){
+  if(!cue.artifacts) return null;
+  if(learner.os==='mac' && cue.artifacts.mac) return cue.artifacts.mac;
+  if(learner.os==='windows' && cue.artifacts.windows) return cue.artifacts.windows;
+  return cue.artifacts.any || cue.artifacts.mac || cue.artifacts.windows || null;
+}
+
+/* ===================== calibration ===================== */
+function startCalibration(){
+  calibrated = true;
+  addMsg('companion',
+    "Before the first cue fires, two quick questions so every step arrives shaped for you. Which machine are you on?",
+    {chips:[
+      {label:'Mac', fn:()=>{learner.os='mac'; addMsg('user','Mac'); askComfort();}},
+      {label:'Windows', fn:()=>{learner.os='windows'; addMsg('user','Windows'); askComfort();}},
+      {label:'Linux', fn:()=>{learner.os='linux'; addMsg('user','Linux'); askComfort();}}
+    ]});
+}
+function askComfort(){
+  addMsg('companion',
+    "And how comfortable are you with a terminal? Be honest, it only changes how much I explain.",
+    {chips:[
+      {label:'Very. Just give me commands.', fn:()=>{learner.comfort='expert'; addMsg('user','Very comfortable'); finishCalibration();}},
+      {label:'Somewhat. Brief context please.', fn:()=>{learner.comfort='mid'; addMsg('user','Somewhat comfortable'); finishCalibration();}},
+      {label:'Not really. Walk me through it.', fn:()=>{learner.comfort='beginner'; addMsg('user','Not really'); finishCalibration();}}
+    ]});
+}
+function finishCalibration(){
+  addMsg('companion',"Noted. Press play whenever you are ready. I will pause the video at each diamond on the rail and hand you the step. You do all the typing, I hold the pace.");
+}
+
+/* ===================== simulated companion ===================== */
+function renderCueSimulated(cue){
+  const art = artifactFor(cue);
+  let intro = cue.intro;
+  if(learner.comfort==='expert' && art){ intro = cue.title+'. Command below. Say done to resume.'; }
+  addMsg('companion', intro, {
+    cue:true,
+    cueTag:'Cue '+fmt(cue.t)+' · '+cue.type,
+    code: art || undefined,
+    chips:[
+      {label:'Explain deeper', fn:()=>addMsg('companion', cue.deeper || 'The track author has not written a deeper note for this cue.')},
+      {label:'Done, resume the video', resume:true, fn:resumeFromCue}
+    ]
+  });
+}
+
+function simulatedReply(userText){
+  if(activeCue){
+    addMsg('companion',
+      "In simulated mode I can only replay what the track author wrote, so use the buttons above for this cue. Paste an Anthropic API key below and press go live, and this becomes a real conversation. The whole track becomes Claude's ground truth and you can ask anything about the step, paste errors, or go off script.");
+  } else {
+    addMsg('companion',
+      "Nothing is holding the floor right now. Press play and I will step in at the next cue. For free conversation between cues, switch to live mode with an API key below.");
+  }
+}
+
+/* ===================== live companion (Claude) ===================== */
+function toggleLive(){
+  const key = document.getElementById('apiKey').value.trim();
+  if(liveMode){
+    liveMode=false; apiKeyMem=''; history=[];
+    document.getElementById('modePill').textContent='Simulated';
+    document.getElementById('modePill').className='pill sim';
+    document.getElementById('liveBtn').textContent='Go live';
+    addMsg('system','Live mode off. Back to the scripted simulation.');
+    return;
+  }
+  if(!key){ addMsg('system','Paste an Anthropic API key first.'); return; }
+  apiKeyMem = key; liveMode = true; history=[];
+  document.getElementById('modePill').textContent='Live · Claude';
+  document.getElementById('modePill').className='pill live';
+  document.getElementById('liveBtn').textContent='Go simulated';
+  addMsg('system','Live mode on. The full track is now Claude\'s ground truth.');
+}
+
+function systemPrompt(){
+  return [
+    track.meta.persona,
+    "",
+    "GROUND RULES:",
+    ...track.meta.groundRules.map(r=>"- "+r),
+    "",
+    "LEARNER: os="+(learner.os||"unknown")+", comfort="+(learner.comfort||"unknown"),
+    "",
+    "THE FULL PROMPT TRACK (your only source of truth):",
+    JSON.stringify(track, null, 1),
+    "",
+    "PROTOCOL: When a message beginning [CUE FIRED] arrives, the player has paused the video at that cue. Present that step to the learner at their level, including the correct artifact for their OS in a fenced code block. Wait for them to do the work. When they indicate the step is complete per the cue's completion condition, end your reply with the exact token <<RESUME>> on its own line, which the player uses to restart the video. Never emit <<RESUME>> otherwise. Keep replies short. One step at a time."
+  ].join("\n");
+}
+
+async function sendToClaude(userText, cue){
+  if(cue){ history.push({role:'user', content:'[CUE FIRED] id='+cue.id+' t='+cue.t+' title="'+cue.title+'"'}); }
+  if(userText){ history.push({role:'user', content:userText}); }
+  const thinking = addMsg('system','Companion is thinking.');
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKeyMem,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:1000,
+        system: systemPrompt(),
+        messages: history
+      })
+    });
+    const data = await res.json();
+    thinking.remove();
+    if(data.error){ addMsg('system','API error: '+(data.error.message||'unknown')); return; }
+    let text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+    history.push({role:'assistant', content:text});
+    const wantsResume = /<<RESUME>>/.test(text);
+    text = text.replace(/<<RESUME>>/g,'').trim();
+    const codeMatch = text.match(/```[a-z]*\n([\s\S]*?)```/);
+    let code=null;
+    if(codeMatch){ code=codeMatch[1].trim(); text=text.replace(codeMatch[0],'').trim(); }
+    addMsg('companion', text, {
+      cue: !!cue, cueTag: cue? 'Cue '+fmt(cue.t)+' · '+cue.type : undefined,
+      code: code||undefined,
+      chips: activeCue ? [{label:'Done, resume the video', resume:true, fn:resumeFromCue}] : undefined
+    });
+    if(wantsResume) resumeFromCue();
+  }catch(err){
+    thinking.remove();
+    addMsg('system','Could not reach the API from this page. Check the key and your network, then try again.');
+  }
+}
+
+/* ===================== composer ===================== */
+function sendUserMessage(){
+  const input = document.getElementById('composerInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value='';
+  addMsg('user', text);
+  if(liveMode){ sendToClaude(text, null); }
+  else { simulatedReply(text); }
+}
+
+/* ===================== track loading ===================== */
+function applyTrack(json, sourceLabel){
+  if(!json || !json.meta || !json.meta.video || !Array.isArray(json.cues)){
+    addMsg('system','That file does not look like a prompt track. It needs meta.video and a cues array.');
+    return;
+  }
+  track = json;
+  fired.clear(); activeCue=null; history=[]; duration=0;
+  document.getElementById('frame').classList.remove('cue-live');
+  document.getElementById('panel').classList.remove('cue-live');
+  addMsg('system','Loaded track: '+(track.meta.title||sourceLabel));
+  if(window.YT && YT.Player){ createPlayer(track.meta.video.id); }
+}
+function loadTrackFromUrl(){
+  const url = document.getElementById('trackUrl').value.trim();
+  if(!url) return;
+  fetch(url).then(r=>r.json()).then(j=>applyTrack(j,url))
+    .catch(()=>addMsg('system','Could not fetch or parse that URL. It must serve raw JSON with CORS allowed, for example a raw.githubusercontent.com link.'));
+}
+function loadTrackFromFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ try{ applyTrack(JSON.parse(reader.result), file.name); }catch(e){ addMsg('system','That file is not valid JSON.'); } };
+  reader.readAsText(file);
+}
+
+/* ===================== boot ===================== */
+addMsg('companion',
+  "Hello. This player demonstrates a prompt track, a timestamped sidecar of creator authored cues attached to an ordinary video, toggleable like captions.\n\nThe sample track is self referential. Its cues explain the pattern as they fire. Press play in lab mode and let the first diamond on the rail stop the video. Or switch to lean back and watch it clean first. See one, then do one.");
+startCalibration();
+</script>
+</body>
+</html>

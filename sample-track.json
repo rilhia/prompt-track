@@ -1,0 +1,58 @@
+{
+  "meta": {
+    "title": "Prompt Track sample: the format explains itself",
+    "author": "Richard Hall",
+    "version": "0.1",
+    "video": {
+      "provider": "youtube",
+      "id": "cX-iW0P5L_w",
+      "note": "Big Buck Bunny, a stable public video used as a stand in. Replace with your own tutorial video."
+    },
+    "persona": "You are a calm, practical tutorial companion. You never invent facts. Every command, path, port and setting you give must come verbatim from the ground truth in this track. If asked something the track does not cover, say so plainly and point the learner to the project README. You calibrate depth to the learner's stated comfort level. You never execute anything. The learner does all the work.",
+    "groundRules": [
+      "Only state facts present in this track. Never improvise commands, paths or settings.",
+      "The learner types every command themselves. Never offer to do it for them.",
+      "One step at a time. Confirm the step worked before moving on.",
+      "If the learner pastes an error, help them read it. If the track cannot explain it, say so and suggest opening an issue on the project repository.",
+      "Adapt depth to the learner. Brief for the confident, patient and thorough for the nervous."
+    ]
+  },
+  "cues": [
+    {
+      "id": "cue-1",
+      "t": 12,
+      "type": "do",
+      "title": "Your first cue",
+      "intro": "The video just paused itself. That is a prompt cue firing. In a real tutorial this is the moment the presenter says 'now open a terminal', and instead of you scrubbing back to squint at their screen, the exact command arrives here, correct and copyable. Try this one. It is harmless and just proves your terminal works.",
+      "artifacts": {
+        "mac": "echo \"Prompt tracks: see one, do one, teach one\"",
+        "windows": "echo Prompt tracks: see one, do one, teach one",
+        "any": "echo hello-prompt-track"
+      },
+      "deeper": "Why pause the video at all? Because video sets the pace of understanding but cannot hold the pace of doing. Your machine, your versions and your errors are invisible to a recording. The cue hands the doing to a layer that can see them. The video stays clean and uninterrupted for anyone watching in lean back mode, exactly like captions stay invisible until switched on.",
+      "completion": "The learner ran the echo command and saw the text printed back."
+    },
+    {
+      "id": "cue-2",
+      "t": 45,
+      "type": "checkpoint",
+      "title": "A checkpoint cue",
+      "intro": "This cue is a checkpoint rather than a step. In a real track this is where the companion asks you to verify state before the video moves on, for example 'run docker compose ps and tell me what you see'. Nothing to run here in the sample. Press done when ready and notice the video resumes exactly where it left off.",
+      "artifacts": {},
+      "deeper": "Checkpoints are where the ground truth earns its keep. The track author writes down what correct output looks like at this moment, so the companion can judge your pasted output against a known good state instead of guessing. A generic AI bolted onto a video cannot do this because nobody told it what correct looks like.",
+      "completion": "The learner confirmed they are ready to continue."
+    },
+    {
+      "id": "cue-3",
+      "t": 90,
+      "type": "do",
+      "title": "The track is just a file",
+      "intro": "One last thing worth knowing. Everything driving this experience is a single JSON sidecar file, versioned in a repository next to the video link. When the software in a tutorial changes, the author edits one cue in this file instead of re-recording the video. Open sample-track.json in this repository to see exactly what the companion was given.",
+      "artifacts": {
+        "any": "cat sample-track.json"
+      },
+      "deeper": "This is the same relationship captions have to video. The video file is never touched. The track is a text sidecar that any editor can open, any repository can version, and any pull request can improve. The 'teach one' step of see one, do one, teach one lives here. Learners report where the track stumbled and the next learner gets a better teacher.",
+      "completion": "The learner understands the track is a sidecar file they can read and edit."
+    }
+  ]
+}
